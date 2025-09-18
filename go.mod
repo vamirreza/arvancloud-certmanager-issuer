@@ -1,4 +1,4 @@
-module github.com/ParminCloud/arvancloud-certmanager-issuer
+module github.com/vamirreza/arvancloud-certmanager-issuer
 
 go 1.24.0
 

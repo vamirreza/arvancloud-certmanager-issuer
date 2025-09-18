@@ -3,9 +3,9 @@ appVersion: "v0.0.9"
 description: Helm Chart to install ArvanCloud Webhook Issuer
 name: arvancloud-webhook
 version: 0.0.13
-home: https://github.com/ParminCloud/arvancloud-certmanager-issuer/
+home: https://github.com/vamirreza/arvancloud-certmanager-issuer/
 sources:
-  - https://github.com/ParminCloud/arvancloud-certmanager-issuer/
+  - https://github.com/vamirreza/arvancloud-certmanager-issuer/
 maintainers:
   - name: Muhammed Hussein Karimi
     url: https://karimi.dev

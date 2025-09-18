@@ -134,7 +134,7 @@ func (c *arvanCloudDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) err
 
 	var records DNSRecords
 
-	_, err = c.SendAPIRequest("GET", "/cdn/4.0/domains/"+strings.TrimSuffix(ch.ResolvedZone, ".")+"/dns-records?type=txt&per_page=25&page=1&search="+name, apiKey, nil, &records)
+	_, err = c.SendAPIRequest("GET", "/cdn/4.0/domains/"+strings.TrimSuffix(ch.ResolvedZone, ".")+"/dns-records?type=txt&per_page=25&page=1&search="+url.QueryEscape(name), apiKey, nil, &records)
 	if err != nil {
 		sugar.Errorw(
 			"Error while getting records from ArvanCloud",
@@ -217,7 +217,7 @@ func (c *arvanCloudDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) err
 	)
 	var records DNSRecords
 
-	_, err = c.SendAPIRequest("GET", "/cdn/4.0/domains/"+strings.TrimSuffix(ch.ResolvedZone, ".")+"/dns-records?type=txt&per_page=25&page=1&search="+name, apiKey, nil, &records)
+	_, err = c.SendAPIRequest("GET", "/cdn/4.0/domains/"+strings.TrimSuffix(ch.ResolvedZone, ".")+"/dns-records?type=txt&per_page=25&page=1&search="+url.QueryEscape(name), apiKey, nil, &records)
 	if err != nil {
 		sugar.Errorw(
 			"Error while getting records from ArvanCloud",
