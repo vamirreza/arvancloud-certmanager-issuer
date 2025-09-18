@@ -8,7 +8,6 @@ import (
 
 	"github.com/vamirreza/arvancloud-certmanager-issuer/example"
 )
-
 var (
 	zone = os.Getenv("TEST_ZONE_NAME")
 )
