@@ -119,11 +119,12 @@ func (c *arvanCloudDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) err
 	if err != nil {
 		return err
 	}
-	name := strings.TrimSuffix(strings.TrimSuffix(ch.ResolvedFQDN, ch.ResolvedZone), ".")
-
-	// Find the root domain for ArvanCloud API
-	// ArvanCloud manages DNS for root domains, not subdomains
+	// Calculate the record name relative to the root domain
+	// For subdomains, we need to include the subdomain path in the record name
+	// e.g., _acme-challenge.ae-01.stinascloud.ir -> name: "_acme-challenge.ae-01", domain: "stinascloud.ir"
 	rootDomain := findRootDomain(ch.ResolvedZone)
+	fullRecordName := strings.TrimSuffix(ch.ResolvedFQDN, ".")
+	name := strings.TrimSuffix(fullRecordName, "."+rootDomain)
 
 	apiKey, err := cfg.GetAPIKey(ch.ResourceNamespace, c.kubeClient)
 	if err != nil {
@@ -210,10 +211,10 @@ func (c *arvanCloudDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) err
 	if err != nil {
 		return err
 	}
-	name := strings.TrimSuffix(strings.TrimSuffix(ch.ResolvedFQDN, ch.ResolvedZone), ".")
-
-	// Find the root domain for ArvanCloud API
+	// Calculate the record name relative to the root domain
 	rootDomain := findRootDomain(ch.ResolvedZone)
+	fullRecordName := strings.TrimSuffix(ch.ResolvedFQDN, ".")
+	name := strings.TrimSuffix(fullRecordName, "."+rootDomain)
 
 	apiKey, err := cfg.GetAPIKey(ch.ResourceNamespace, c.kubeClient)
 	if err != nil {
@@ -387,13 +388,13 @@ func loadConfig(cfgJSON *extapi.JSON) (arvanCloudDNSProviderConfig, error) {
 func findRootDomain(zone string) string {
 	// Remove trailing dot
 	zone = strings.TrimSuffix(zone, ".")
-	
+
 	// Split by dots and take the last two parts (domain.tld)
 	parts := strings.Split(zone, ".")
 	if len(parts) >= 2 {
 		return strings.Join(parts[len(parts)-2:], ".")
 	}
-	
+
 	// If less than 2 parts, return as-is
 	return zone
 }
