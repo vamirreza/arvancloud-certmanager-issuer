@@ -121,6 +121,10 @@ func (c *arvanCloudDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) err
 	}
 	name := strings.TrimSuffix(strings.TrimSuffix(ch.ResolvedFQDN, ch.ResolvedZone), ".")
 
+	// Find the root domain for ArvanCloud API
+	// ArvanCloud manages DNS for root domains, not subdomains
+	rootDomain := findRootDomain(ch.ResolvedZone)
+
 	apiKey, err := cfg.GetAPIKey(ch.ResourceNamespace, c.kubeClient)
 	if err != nil {
 		return err
@@ -130,11 +134,14 @@ func (c *arvanCloudDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) err
 		"Name", name,
 		"Type", "TXT",
 		"Value", ch.Key,
+		"ResolvedZone", ch.ResolvedZone,
+		"RootDomain", rootDomain,
+		"ResolvedFQDN", ch.ResolvedFQDN,
 	)
 
 	var records DNSRecords
 
-	_, err = c.SendAPIRequest("GET", "/cdn/4.0/domains/"+strings.TrimSuffix(ch.ResolvedZone, ".")+"/dns-records?type=txt&per_page=25&page=1&search="+url.QueryEscape(name), apiKey, nil, &records)
+	_, err = c.SendAPIRequest("GET", "/cdn/4.0/domains/"+rootDomain+"/dns-records?type=txt&per_page=25&page=1&search="+url.QueryEscape(name), apiKey, nil, &records)
 	if err != nil {
 		sugar.Errorw(
 			"Error while getting records from ArvanCloud",
@@ -166,7 +173,7 @@ func (c *arvanCloudDNSProviderSolver) Present(ch *v1alpha1.ChallengeRequest) err
 		Name: name,
 	}
 	var createResponseBody any
-	createResponse, err := c.SendAPIRequest("POST", "/cdn/4.0/domains/"+strings.TrimSuffix(ch.ResolvedZone, ".")+"/dns-records", apiKey, record, &createResponseBody)
+	createResponse, err := c.SendAPIRequest("POST", "/cdn/4.0/domains/"+rootDomain+"/dns-records", apiKey, record, &createResponseBody)
 	if err != nil {
 		sugar.Errorw(
 			"Error while creating record in ArvanCloud",
@@ -205,6 +212,9 @@ func (c *arvanCloudDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) err
 	}
 	name := strings.TrimSuffix(strings.TrimSuffix(ch.ResolvedFQDN, ch.ResolvedZone), ".")
 
+	// Find the root domain for ArvanCloud API
+	rootDomain := findRootDomain(ch.ResolvedZone)
+
 	apiKey, err := cfg.GetAPIKey(ch.ResourceNamespace, c.kubeClient)
 	if err != nil {
 		return err
@@ -214,10 +224,12 @@ func (c *arvanCloudDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) err
 		"Name", name,
 		"Type", "TXT",
 		"Value", ch.Key,
+		"ResolvedZone", ch.ResolvedZone,
+		"RootDomain", rootDomain,
 	)
 	var records DNSRecords
 
-	_, err = c.SendAPIRequest("GET", "/cdn/4.0/domains/"+strings.TrimSuffix(ch.ResolvedZone, ".")+"/dns-records?type=txt&per_page=25&page=1&search="+url.QueryEscape(name), apiKey, nil, &records)
+	_, err = c.SendAPIRequest("GET", "/cdn/4.0/domains/"+rootDomain+"/dns-records?type=txt&per_page=25&page=1&search="+url.QueryEscape(name), apiKey, nil, &records)
 	if err != nil {
 		sugar.Errorw(
 			"Error while getting records from ArvanCloud",
@@ -232,7 +244,7 @@ func (c *arvanCloudDNSProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) err
 	for _, record := range records.Data {
 		if record.Name == name && record.Value["text"] == ch.Key {
 			var cleanUpResponseBody any
-			response, err := c.SendAPIRequest("DELETE", "/cdn/4.0/domains/"+strings.TrimSuffix(ch.ResolvedZone, ".")+"/dns-records/"+record.ID, apiKey, nil, &cleanUpResponseBody)
+			response, err := c.SendAPIRequest("DELETE", "/cdn/4.0/domains/"+rootDomain+"/dns-records/"+record.ID, apiKey, nil, &cleanUpResponseBody)
 			if err != nil {
 				sugar.Errorw(
 					"Error while cleaning up records from ArvanCloud",
@@ -351,7 +363,7 @@ func (c *arvanCloudDNSProviderSolver) Initialize(kubeClientConfig *rest.Config, 
 	c.kubeClient = cl
 
 	c.httpClient = &http.Client{
-		Timeout: time.Duration(1) * time.Second,
+		Timeout: time.Duration(30) * time.Second,
 	}
 	return nil
 }
@@ -367,4 +379,21 @@ func loadConfig(cfgJSON *extapi.JSON) (arvanCloudDNSProviderConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+// findRootDomain extracts the root domain from a zone
+// ArvanCloud manages DNS records for root domains only
+// e.g., "ae-01.stinascloud.ir." -> "stinascloud.ir"
+func findRootDomain(zone string) string {
+	// Remove trailing dot
+	zone = strings.TrimSuffix(zone, ".")
+	
+	// Split by dots and take the last two parts (domain.tld)
+	parts := strings.Split(zone, ".")
+	if len(parts) >= 2 {
+		return strings.Join(parts[len(parts)-2:], ".")
+	}
+	
+	// If less than 2 parts, return as-is
+	return zone
 }
